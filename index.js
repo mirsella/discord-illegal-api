@@ -1,6 +1,7 @@
 const puppeteer = require('puppeteer');
 require('dotenv').config()
 const chalk = require('chalk');
+var argv = require('minimist')(process.argv.slice(2), {alias: {q: 'quiet'}});
 
 function getLoginInfo(info) { 
   if (eval(`process.env.${info}`)) {
@@ -16,15 +17,15 @@ const error = chalk.redBright.bold;
 const warning = chalk.keyword('orange');
 
 // check for options
-let quiet = false
-if (process.argv.includes('--quiet')) {
-  process.argv.splice(process.argv.indexOf('--quiet'), 1)
-  quiet = true
-}
+// let quiet = false
+// if (process.argv.includes('--quiet')) {
+//   process.argv.splice(process.argv.indexOf('--quiet'), 1)
+//   quiet = true
+// }
 
 // get the username(s) to check
 let usernames = []
-process.argv.slice(2).length != 0 && (process.argv.slice(2).forEach(username => usernames.push(username))) // usernames from shell arguments
+argv._.length != 0 && (argv._.forEach(username => usernames.push(username))) // usernames from shell arguments
 process.env.usernames && (process.env.usernames.split(',').forEach(username => usernames.push(username))) // usernames from .env file
 usernames = [... new Set(usernames)] // remove duplicates
 // filter the [','] from ↑ and the username who don't match the regex.
@@ -36,7 +37,7 @@ usernames = usernames.filter(username => {
     return false
   }
 })
-quiet || console.log(chalk.green('thoses usernames will be checked :', usernames));
+argv.quiet || console.log(chalk.green('thoses usernames will be checked :', usernames));
 
 // get user input interface
 const readline = require('readline').createInterface({
@@ -76,7 +77,7 @@ const readline = require('readline').createInterface({
             readline.question(warning('OTP code needed. please enter it or disable it for this account\n'), async code => {
               await page.type('[class^=inputDefault]', code, {delay: 20})
               await page.click('[type="submit"]')
-              quiet || await page.waitForResponse(response => response.url().includes('https://discord.com/api/v8/auth/mfa/totp'))
+              argv.quiet || await page.waitForResponse(response => response.url().includes('https://discord.com/api/v8/auth/mfa/totp'))
                 .then(res => {
                   res.ok() && console.log(chalk.green('successfully connected to discord'))
                 })
@@ -85,7 +86,7 @@ const readline = require('readline').createInterface({
           } else if (json.sms) {
             console.log(warning("SMS verification code detected. please open a issue on github as it's not supposed to happen. use OTP instead"))
           } else {
-            quiet || console.log(chalk.green('successfully connected to discord'))
+            argv.quiet || console.log(chalk.green('successfully connected to discord'))
           }
         })
       } else {
@@ -103,7 +104,7 @@ const readline = require('readline').createInterface({
 
   for (username of usernames) {
     let status = await check(username)
-    if (quiet) {
+    if (argv.quiet) {
       console.log(status)
     } else {
       switch(status) {
