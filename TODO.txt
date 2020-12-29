@@ -1,0 +1,9 @@
+support OTP
+option for :
+  --onlystatus print only the status
+
+
+keep connected to discord and be able to check username. 
+web socket so the server with puppeteer and a client.js which talk to the server ?
+
+i don't see others way
