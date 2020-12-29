@@ -2,8 +2,6 @@ dependencies:
   chalk: 4.1.0
   dotenv: 8.2.0
   puppeteer: 5.5.0
-devDependencies:
-  cli-interact: 0.1.9
 lockfileVersion: 5.2
 packages:
   /@types/node/14.14.16:
@@ -79,14 +77,6 @@ packages:
     dev: false
     resolution:
       integrity: sha512-jJ0bqzaylmJtVnNgzTeSOs8DPavpbYgEr/b0YL8/2GO3xJEhInFmhKMUnEJQjZumK7KXGFhUy89PrsJWlakBVg==
-  /cli-interact/0.1.9:
-    dependencies:
-      readline-sync: 0.4.10
-    dev: true
-    engines:
-      node: '>= 0.8.0'
-    resolution:
-      integrity: sha1-5YroUFu/ftLhJnEFfNVZsS/c4o8=
   /color-convert/2.0.1:
     dependencies:
       color-name: 1.1.4
@@ -344,12 +334,6 @@ packages:
       node: '>= 6'
     resolution:
       integrity: sha512-BViHy7LKeTz4oNnkcLJ+lVSL6vpiFeX6/d3oSH8zCW7UxP2onchk+vTGB143xuFjHS3deTgkKoXXymXqymiIdA==
-  /readline-sync/0.4.10:
-    dev: true
-    engines:
-      node: '>= 0.8.0'
-    resolution:
-      integrity: sha1-vvA9mT7KNYX9Bk9dVtcnZ2XfwSE=
   /rimraf/3.0.2:
     dependencies:
       glob: 7.1.6
@@ -438,6 +422,5 @@ packages:
       integrity: sha1-x+sXyT4RLLEIb6bY5R+wZnt5pfk=
 specifiers:
   chalk: ^4.1.0
-  cli-interact: ^0.1.9
   dotenv: ^8.2.0
   puppeteer: ^5.5.0

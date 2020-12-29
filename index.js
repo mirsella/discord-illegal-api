@@ -38,8 +38,11 @@ usernames = usernames.filter(username => {
 })
 quiet || console.log(chalk.green('thoses usernames will be checked :', usernames));
 
-
-
+// get user input interface
+const readline = require('readline').createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
 (async () => {
 
   async function check(username) {
@@ -56,7 +59,7 @@ quiet || console.log(chalk.green('thoses usernames will be checked :', usernames
     return status.replace('url(#svg-mask-status-', '').replace(')', '')
   }
 
-  const browser = await puppeteer.launch({headless: true, defaultViewport: {width: 1280, height: 720}});
+  const browser = await puppeteer.launch({headless: false, defaultViewport: {width: 1280, height: 720}});
   const page = await browser.newPage();
   await page.goto('https://discord.com/channels/@me');
 
@@ -68,7 +71,23 @@ quiet || console.log(chalk.green('thoses usernames will be checked :', usernames
   await page.waitForResponse(response => response.url().includes('https://discord.com/api/v8/auth/login'))
     .then(res => {
       if (res.ok()) {
-        quiet || console.log(chalk.green('successfully connected to discord'))
+        res.json().then(json => {
+          if (json.mfa) {
+            readline.question(warning('OTP code needed. please enter it or disable it for this account\n'), async code => {
+              await page.type('[class^=inputDefault]', code, {delay: 20})
+              await page.click('[type="submit"]')
+              quiet || await page.waitForResponse(response => response.url().includes('https://discord.com/api/v8/auth/mfa/totp'))
+                .then(res => {
+                  res.ok() && console.log(chalk.green('successfully connected to discord'))
+                })
+              readline.close();
+            })
+          } else if (json.sms) {
+            console.log(warning("SMS verification code detected. please open a issue on github as it's not supposed to happen. use OTP instead"))
+          } else {
+            quiet || console.log(chalk.green('successfully connected to discord'))
+          }
+        })
       } else {
         console.log(error("couldn't connect"))
         res.json().then(json => {
@@ -82,7 +101,6 @@ quiet || console.log(chalk.green('thoses usernames will be checked :', usernames
   // waiting for discord to load. if only this was implemented : https://github.com/puppeteer/puppeteer/issues/5328
   await page.waitForSelector('[class^=searchBarComponent-]', {waitUntil: 'networkidle0'})
 
-  // console.log(await check('mirsella#1008'))
   for (username of usernames) {
     let status = await check(username)
     if (quiet) {
@@ -106,5 +124,5 @@ quiet || console.log(chalk.green('thoses usernames will be checked :', usernames
       }
     }
   }
-  await browser.close();
+  // await browser.close();
 })();

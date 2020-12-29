@@ -1,4 +1,5 @@
-support OTP
+support google captcha
+support !npm otp
 
 keep connected to discord and be able to check username. 
 web socket so the server with puppeteer and a client.js which talk to the server ?
