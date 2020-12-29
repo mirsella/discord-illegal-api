@@ -15,6 +15,13 @@ function getLoginInfo(info) {
 const error = chalk.redBright.bold;
 const warning = chalk.keyword('orange');
 
+// check for options
+let quiet = false
+if (process.argv.includes('--quiet')) {
+  process.argv.splice(process.argv.indexOf('--quiet'), 1)
+  quiet = true
+}
+
 // get the username(s) to check
 let usernames = []
 process.argv.slice(2).length != 0 && (process.argv.slice(2).forEach(username => usernames.push(username))) // usernames from shell arguments
@@ -29,7 +36,7 @@ usernames = usernames.filter(username => {
     return false
   }
 })
-console.log(chalk.green('thoses usernames will be checked :', usernames));
+quiet || console.log(chalk.green('thoses usernames will be checked :', usernames));
 
 
 
@@ -58,10 +65,11 @@ console.log(chalk.green('thoses usernames will be checked :', usernames));
   await page.click('[type="submit"]')
 
   // check if the login was successfull
-  // TODO : add otp support
   await page.waitForResponse(response => response.url().includes('https://discord.com/api/v8/auth/login'))
     .then(res => {
-      if (!res.ok()) {
+      if (res.ok()) {
+        quiet || console.log(chalk.green('successfully connected to discord'))
+      } else {
         console.log(error("couldn't connect"))
         res.json().then(json => {
           console.log(warning("email :", json.errors.login._errors[0].code, json.errors.login._errors[0].message))
@@ -76,21 +84,26 @@ console.log(chalk.green('thoses usernames will be checked :', usernames));
 
   // console.log(await check('mirsella#1008'))
   for (username of usernames) {
-    switch(await check(username)) {
-      case "online":
-        console.log(chalk.bold(`${username} : `) + chalk.green.bold("online"))
-        break;
-      case "offline":
-        console.log(chalk.bold(`${username} : `) + chalk.gray.bold("offline"))
-        break;
-      case "idle":
-        console.log(chalk.bold(`${username} : `) + chalk.keyword("orange").bold("idle"))
-        break;
-      case "dnd":
-        console.log(chalk.bold(`${username} : `) + chalk.red.bold("do not disturb"))
-        break;
-      default:
-        console.log(username, 'default')
+    let status = await check(username)
+    if (quiet) {
+      console.log(status)
+    } else {
+      switch(status) {
+        case "online":
+          console.log(chalk.bold(`${username} : `) + chalk.green.bold("online"))
+          break;
+        case "offline":
+          console.log(chalk.bold(`${username} : `) + chalk.gray.bold("offline"))
+          break;
+        case "idle":
+          console.log(chalk.bold(`${username} : `) + chalk.keyword("orange").bold("idle"))
+          break;
+        case "dnd":
+          console.log(chalk.bold(`${username} : `) + chalk.red.bold("do not disturb"))
+          break;
+        default:
+          console.log(username, 'default')
+      }
     }
   }
   await browser.close();
