@@ -1,7 +1,8 @@
 const puppeteer = require('puppeteer');
+const totp = require('totp-generator');
 require('dotenv').config()
 const chalk = require('chalk');
-var argv = require('minimist')(process.argv.slice(2), {alias: {q: 'quiet'}});
+let argv = require('minimist')(process.argv.slice(2), {alias: {q: 'quiet'}});
 
 function getLoginInfo(info) { 
   if (eval(`process.env.${info}`)) {
@@ -15,13 +16,6 @@ function getLoginInfo(info) {
 // chalk settings
 const error = chalk.redBright.bold;
 const warning = chalk.keyword('orange');
-
-// check for options
-// let quiet = false
-// if (process.argv.includes('--quiet')) {
-//   process.argv.splice(process.argv.indexOf('--quiet'), 1)
-//   quiet = true
-// }
 
 // get the username(s) to check
 let usernames = []
@@ -72,19 +66,35 @@ const readline = require('readline').createInterface({
   await page.waitForResponse(response => response.url().includes('https://discord.com/api/v8/auth/login'))
     .then(res => {
       if (res.ok()) {
-        res.json().then(json => {
+        res.json().then(async json => {
           if (json.mfa) {
-            readline.question(warning('OTP code needed. please enter it or disable it for this account\n'), async code => {
-              await page.type('[class^=inputDefault]', code, {delay: 20})
+            if (process.env.totp) {
+              await page.type('[class^=inputDefault]', totp(process.env.totp), {delay: 20})
               await page.click('[type="submit"]')
               argv.quiet || await page.waitForResponse(response => response.url().includes('https://discord.com/api/v8/auth/mfa/totp'))
                 .then(res => {
                   res.ok() && console.log(chalk.green('successfully connected to discord'))
                 })
-              readline.close();
-            })
+            } else {
+              readline.question(warning('TOTP code needed. please enter it or disable it for this account\n'), async code => {
+                await page.type('[class^=inputDefault]', code, {delay: 20})
+                await page.click('[type="submit"]')
+                argv.quiet || await page.waitForResponse(response => response.url().includes('https://discord.com/api/v8/auth/mfa/totp'))
+                  .then(res => {
+                    res.ok() && console.log(chalk.green('successfully connected to discord'))
+                  })
+                readline.close();
+              })
+            }
           } else if (json.sms) {
-            console.log(warning("SMS verification code detected. please open a issue on github as it's not supposed to happen. use OTP instead"))
+            console.log(warning("SMS verification code detected. please open a issue on github as it's not supposed to happen. use TOTP instead"))
+          } else if (json.captcha_key) {
+            // TODO : relaunch in headless: false and make the user complete the captcha
+            console.log(error('a captcha is needed. support for it soon', json.captcha_key)) 
+            process.exit(1)
+          } else if (json.errors.login._errors[0].code === "ACCOUNT_LOGIN_VERIFICATION_EMAIL") {
+            console.log(error("check your emails, discord need verification"))
+            process.exit(1)
           } else {
             argv.quiet || console.log(chalk.green('successfully connected to discord'))
           }
