@@ -42,8 +42,9 @@ const readline = require('readline').createInterface({
 (async () => {
 
   async function check(username) {
-    await page.click('[class^=searchBarComponent-]')
+    await page.click('[class*=searchBarComponent-]')
     await page.type('[class*=quickswitcher-] > input', '@'+username)
+    await page.waitForSelector('[class^="contentDefault-"] > [class^="iconContainer-"]')
     if (await page.$('[class^="contentDefault-"] > [class^="iconContainer-"]') === null) {
       console.log(error("couldn't find the user "+username))
       console.log(warning(`please try to manually search @${username} in the discord find menu too verify`))
@@ -55,9 +56,9 @@ const readline = require('readline').createInterface({
     return status.replace('url(#svg-mask-status-', '').replace(')', '')
   }
 
-  const browser = await puppeteer.launch({headless: true, defaultViewport: {width: 1280, height: 720}});
+  const browser = await puppeteer.launch({headless: false, defaultViewport: {width: 1280, height: 720}});
   const page = await browser.newPage();
-  await page.goto('https://discord.com/channels/@me');
+  await page.goto('https://discord.com/channels/@me', {waitUntil: 'networkidle0'});
 
   await page.type('[name="email"]', getLoginInfo('email'));
   await page.type('[name="password"]', getLoginInfo('password'));
@@ -149,9 +150,21 @@ const readline = require('readline').createInterface({
         }
       })
   })
-
-  // waiting for discord to load. if only this was implemented : https://github.com/puppeteer/puppeteer/issues/5328
   await page.waitForSelector('[class^=searchBarComponent-]')
+
+  // my ugly baby to remediate the lack of page.waitForNetwork() https://github.com/puppeteer/puppeteer/issues/5328
+  let epochLastResponse = Math.floor(new Date() / 1000)
+  page.on("response", res => {
+    epochLastResponse = Math.floor(new Date() / 1000)
+  })
+  await new Promise(async resolve => {
+    let checkResponseInterval = await setInterval(() => {
+      if(Math.floor(new Date() / 1000) - 2 >= epochLastResponse) {
+        clearInterval(checkResponseInterval)
+        resolve()
+      }
+    }, 1000)
+  })
 
   for (username of usernames) {
     let status = await check(username)
@@ -168,5 +181,5 @@ const readline = require('readline').createInterface({
     }
   }
   await browser.close();
-  process.exit(0)
+  process.exit(0) // i don't know why node doesn't exit by itself after the browser.close(), and there is no more puppeteer process
 })()
