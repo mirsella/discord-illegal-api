@@ -3,6 +3,7 @@ dependencies:
   dotenv: 8.2.0
   minimist: 1.2.5
   puppeteer: 5.5.0
+  totp-generator: 0.0.8
 lockfileVersion: 5.2
 packages:
   /@types/node/14.14.16:
@@ -208,6 +209,11 @@ packages:
     dev: false
     resolution:
       integrity: sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==
+  /jssha/2.4.2:
+    deprecated: jsSHA versions < 3.0.0 will no longer receive feature updates
+    dev: false
+    resolution:
+      integrity: sha512-/jsi/9C0S70zfkT/4UlKQa5E1xKurDnXcQizcww9JSR/Fv+uIbWM2btG+bFcL3iNoK9jIGS0ls9HWLr1iw0kFg==
   /locate-path/5.0.0:
     dependencies:
       p-locate: 4.1.0
@@ -389,6 +395,12 @@ packages:
     dev: false
     resolution:
       integrity: sha1-DdTJ/6q8NXlgsbckEV1+Doai4fU=
+  /totp-generator/0.0.8:
+    dependencies:
+      jssha: 2.4.2
+    dev: false
+    resolution:
+      integrity: sha512-87DRKP0H5e7DwJKHO19/DqAr0VltZAzPYcEWyPZpoi/5Cx6v0hbMehael9O85zgStT1SWOoPnr1WTiJKAVRxog==
   /unbzip2-stream/1.4.3:
     dependencies:
       buffer: 5.7.1
@@ -430,3 +442,4 @@ specifiers:
   dotenv: ^8.2.0
   minimist: ^1.2.5
   puppeteer: ^5.5.0
+  totp-generator: ^0.0.8

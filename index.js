@@ -38,11 +38,12 @@ const readline = require('readline').createInterface({
   input: process.stdin,
   output: process.stdout
 });
+
 (async () => {
 
   async function check(username) {
     await page.click('[class^=searchBarComponent-]')
-    await page.type('[class*=quickswitcher-] > input', '@'+username, {delay: 20})
+    await page.type('[class*=quickswitcher-] > input', '@'+username)
     if (await page.$('[class^="contentDefault-"] > [class^="iconContainer-"]') === null) {
       console.log(error("couldn't find the user "+username))
       console.log(warning(`please try to manually search @${username} in the discord find menu too verify`))
@@ -54,86 +55,118 @@ const readline = require('readline').createInterface({
     return status.replace('url(#svg-mask-status-', '').replace(')', '')
   }
 
-  const browser = await puppeteer.launch({headless: false, defaultViewport: {width: 1280, height: 720}});
+  const browser = await puppeteer.launch({headless: true, defaultViewport: {width: 1280, height: 720}});
   const page = await browser.newPage();
   await page.goto('https://discord.com/channels/@me');
 
-  await page.type('[name="email"]', getLoginInfo('email'), {delay: 20});
-  await page.type('[name="password"]', getLoginInfo('password'), {delay: 20});
+  await page.type('[name="email"]', getLoginInfo('email'));
+  await page.type('[name="password"]', getLoginInfo('password'));
   await page.click('[type="submit"]')
 
   // check if the login was successfull
-  await page.waitForResponse(response => response.url().includes('https://discord.com/api/v8/auth/login'))
-    .then(res => {
-      if (res.ok()) {
-        res.json().then(async json => {
-          if (json.mfa) {
-            if (process.env.totp) {
-              await page.type('[class^=inputDefault]', totp(process.env.totp), {delay: 20})
-              await page.click('[type="submit"]')
-              argv.quiet || await page.waitForResponse(response => response.url().includes('https://discord.com/api/v8/auth/mfa/totp'))
-                .then(res => {
-                  res.ok() && console.log(chalk.green('successfully connected to discord'))
-                })
-            } else {
-              readline.question(warning('TOTP code needed. please enter it or disable it for this account\n'), async code => {
-                await page.type('[class^=inputDefault]', code, {delay: 20})
+  await new Promise(async resolve => {
+    await page.waitForResponse(response => response.url().includes('https://discord.com/api/v8/auth/login'))
+      .then(res => {
+        if (res.ok()) {
+          res.json().then(async json => {
+            if (json.mfa) {
+              if (process.env.totp) {
+                await page.type('[class^=inputDefault]', totp(process.env.totp))
                 await page.click('[type="submit"]')
-                argv.quiet || await page.waitForResponse(response => response.url().includes('https://discord.com/api/v8/auth/mfa/totp'))
-                  .then(res => {
-                    res.ok() && console.log(chalk.green('successfully connected to discord'))
-                  })
-                readline.close();
-              })
+              } else {
+                readline.question(warning('TOTP code needed. please enter it or disable it for this account\n'), async code => {
+                  await page.type('[class^=inputDefault]', code)
+                  await page.click('[type="submit"]')
+                  readline.close();
+                })
+              }
+              await page.waitForResponse(response => response.url().includes('https://discord.com/api/v8/auth/mfa/totp'))
+                .then(res => {
+                  if (res.ok()) { 
+                    argv.quiet || console.log(chalk.green('successfully connected to discord'))
+                    resolve()
+                  } else {
+                    res.json().then(json => {
+                      console.log("the TOTP was wrong. try again\n", json)
+                      process.exit(1)
+                    })
+                  }
+                })
+            } else if (json.sms) {
+              console.log(error("SMS verification code detected. please open a issue on github as it's not supposed to happen. use TOTP instead"))
+              process.exit(1)
+            } else if (json.errors) {
+              try {
+                if (json.errors.login._errors[0].code === "ACCOUNT_LOGIN_VERIFICATION_EMAIL") {
+                  console.log(error("check your emails, discord need email verification"))
+                }
+              } catch {
+                console.log(error("couldn't connect\n", json.errors))
+              }
+              process.exit(1)
+            } else {
+              argv.quiet || console.log(chalk.green('successfully connected to discord'))
+              resolve()
             }
-          } else if (json.sms) {
-            console.log(warning("SMS verification code detected. please open a issue on github as it's not supposed to happen. use TOTP instead"))
-          } else if (json.captcha_key) {
-            // TODO : relaunch in headless: false and make the user complete the captcha
-            console.log(error('a captcha is needed. support for it soon', json.captcha_key)) 
-            process.exit(1)
-          } else if (json.errors.login._errors[0].code === "ACCOUNT_LOGIN_VERIFICATION_EMAIL") {
-            console.log(error("check your emails, discord need verification"))
-            process.exit(1)
-          } else {
-            argv.quiet || console.log(chalk.green('successfully connected to discord'))
-          }
-        })
-      } else {
-        console.log(error("couldn't connect"))
-        res.json().then(json => {
-          console.log(warning("email :", json.errors.login._errors[0].code, json.errors.login._errors[0].message))
-          console.log(warning("password :", json.errors.password._errors[0].code, json.errors.password._errors[0].message))
-          process.exit(1)
-        })
-      }
-    })
+          })
+        } else {
+          res.json().then(async json => {
+            if (json.captcha_key) {
+              console.log(error('a captcha is needed. please complete it manually. it should be the only time for this IP')); 
+
+              const shownBrowser = await puppeteer.launch({headless: true, defaultViewport: null});
+              const shownPage = await shownBrowser.newPage();
+              await shownPage.goto('https://discord.com/channels/@me');
+
+              await shownPage.type('[name="email"]', getLoginInfo('email'));
+              await shownPage.type('[name="password"]', getLoginInfo('password'));
+              await shownPage.click('[type="submit"]')
+              await shownPage.evaluate(() => {
+                alert("please complete the captcha and any extra step if needed to login to discord.")
+              })
+              await shownPage.waitForSelector('[class^=searchBarComponent-]', {timeout: 120000})
+                .catch (e => {
+                  console.log(typeof e)
+                  if (e.includes("TimeoutError")) {
+                    console.log(error("2min timeout expired, try again\n"))
+                  } else {
+                    console.log(error(e))
+                  }
+                  process.exit(1)
+                })
+              await shownBrowser.close()
+              await page.reload()
+              await page.type('[name="email"]', getLoginInfo('email'));
+              await page.type('[name="password"]', getLoginInfo('password'));
+              await page.click('[type="submit"]')
+              resolve()
+            } else {
+              console.log(warning("error email :", json.errors.login._errors[0].code, json.errors.login._errors[0].message))
+              console.log(warning("error password :", json.errors.password._errors[0].code, json.errors.password._errors[0].message))
+              process.exit(1)
+            }
+          })
+        }
+      })
+  })
 
   // waiting for discord to load. if only this was implemented : https://github.com/puppeteer/puppeteer/issues/5328
-  await page.waitForSelector('[class^=searchBarComponent-]', {waitUntil: 'networkidle0'})
+  await page.waitForSelector('[class^=searchBarComponent-]')
 
   for (username of usernames) {
     let status = await check(username)
     if (argv.quiet) {
-      console.log(status)
+      console.log(username, status)
     } else {
-      switch(status) {
-        case "online":
-          console.log(chalk.bold(`${username} : `) + chalk.green.bold("online"))
-          break;
-        case "offline":
-          console.log(chalk.bold(`${username} : `) + chalk.gray.bold("offline"))
-          break;
-        case "idle":
-          console.log(chalk.bold(`${username} : `) + chalk.keyword("orange").bold("idle"))
-          break;
-        case "dnd":
-          console.log(chalk.bold(`${username} : `) + chalk.red.bold("do not disturb"))
-          break;
-        default:
-          console.log(username, 'default')
+      const responses = {
+        online: chalk.green("online"),
+        offline: chalk.gray("offline"),
+        idle: chalk.keyword("orange")("idle"),
+        dnd: chalk.red("do not disturb")
       }
+      console.log(chalk.bold(`${username} : ${responses[status]}`))
     }
   }
-  // await browser.close();
-})();
+  await browser.close();
+  process.exit(0)
+})()
