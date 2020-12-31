@@ -114,7 +114,7 @@ const readline = require('readline').createInterface({
             if (json.captcha_key) {
               console.log(error('a captcha is needed. please complete it manually. it should be the only time for this IP')); 
 
-              const shownBrowser = await puppeteer.launch({headless: true, defaultViewport: null});
+              const shownBrowser = await puppeteer.launch({headless: false, defaultViewport: null});
               const shownPage = await shownBrowser.newPage();
               await shownPage.goto('https://discord.com/channels/@me');
 
