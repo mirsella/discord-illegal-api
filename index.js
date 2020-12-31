@@ -33,7 +33,7 @@ usernames = usernames.filter(username => {
 })
 argv.quiet || console.log(chalk.green('thoses usernames will be checked :', usernames));
 
-// get user input interface
+// get user input interface for OTP
 const readline = require('readline').createInterface({
   input: process.stdin,
   output: process.stdout
@@ -56,7 +56,7 @@ const readline = require('readline').createInterface({
     return status.replace('url(#svg-mask-status-', '').replace(')', '')
   }
 
-  const browser = await puppeteer.launch({headless: false, defaultViewport: {width: 1280, height: 720}});
+  const browser = await puppeteer.launch({headless: argv.headless || true, defaultViewport: {width: 1280, height: 720}});
   const page = await browser.newPage();
   await page.goto('https://discord.com/channels/@me', {waitUntil: 'networkidle0'});
 
@@ -177,7 +177,7 @@ const readline = require('readline').createInterface({
         idle: chalk.keyword("orange")("idle"),
         dnd: chalk.red("do not disturb")
       }
-      console.log(chalk.bold(`${username} : ${responses[status]}`))
+      console.log(chalk.bold(`${username} : ${responses[status] || chalk.green(status)}`))
     }
   }
   await browser.close();
