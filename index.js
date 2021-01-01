@@ -2,7 +2,7 @@ const puppeteer = require('puppeteer');
 const totp = require('totp-generator');
 require('dotenv').config()
 const chalk = require('chalk');
-let argv = require('minimist')(process.argv.slice(2), {alias: {q: 'quiet'}});
+let argv = require('minimist')(process.argv.slice(2), {alias: {q: 'quiet'}, default: {headless: true}, boolean: ["headless"]});
 
 function getLoginInfo(info) { 
   if (eval(`process.env.${info}`)) {
@@ -56,7 +56,7 @@ const readline = require('readline').createInterface({
     return status.replace('url(#svg-mask-status-', '').replace(')', '')
   }
 
-  const browser = await puppeteer.launch({headless: argv.headless || true, defaultViewport: {width: 1280, height: 720}});
+  const browser = await puppeteer.launch({headless: argv.headless, defaultViewport: {width: 1280, height: 720}});
   const page = await browser.newPage();
   await page.goto('https://discord.com/channels/@me', {waitUntil: 'networkidle0'});
 
@@ -72,7 +72,7 @@ const readline = require('readline').createInterface({
           res.json().then(async json => {
             if (json.mfa) {
               if (process.env.totp) {
-                await page.type('[class^=inputDefault]', totp(process.env.totp))
+                await page.type('[class^=inputDefault]', totp(process.env.totp), {delay: 20})
                 await page.click('[type="submit"]')
               } else {
                 readline.question(warning('TOTP code needed. please enter it or disable it for this account\n'), async code => {
@@ -153,18 +153,20 @@ const readline = require('readline').createInterface({
   await page.waitForSelector('[class^=searchBarComponent-]')
 
   // my ugly baby to remediate the lack of page.waitForNetwork() https://github.com/puppeteer/puppeteer/issues/5328
-  let epochLastResponse = Math.floor(new Date() / 1000)
-  page.on("response", res => {
-    epochLastResponse = Math.floor(new Date() / 1000)
-  })
-  await new Promise(async resolve => {
-    let checkResponseInterval = await setInterval(() => {
-      if(Math.floor(new Date() / 1000) - 2 >= epochLastResponse) {
-        clearInterval(checkResponseInterval)
-        resolve()
-      }
-    }, 1000)
-  })
+  async function waitForNetwork(duration) {
+    let epochLastResponse = Math.floor(new Date() / 1000)
+    page.on("response", res => {
+      epochLastResponse = Math.floor(new Date() / 1000)
+    })
+    await new Promise(async resolve => {
+      let checkResponseInterval = await setInterval(() => {
+        if(Math.floor(new Date() / 1000) - 2 >= epochLastResponse) {
+          clearInterval(checkResponseInterval)
+          resolve()
+        }
+      }, 1000)
+    })
+  }
 
   for (username of usernames) {
     let status = await check(username)
