@@ -1,8 +1,13 @@
 const puppeteer = require('puppeteer');
+const morgan = require('morgan')
+const express = require('express');
 const totp = require('totp-generator');
 require('dotenv').config()
 const chalk = require('chalk');
-let argv = require('minimist')(process.argv.slice(2), {alias: {q: 'quiet'}, default: {headless: true}, boolean: ["headless"]});
+const argv = require('minimist')(process.argv.slice(2), {default: {headless: true}, boolean: ["headless"]});
+const app = express();
+app.use(morgan('common'))
+app.use(express.json()); 
 
 function getLoginInfo(info) { 
   if (eval(`process.env.${info}`)) {
@@ -17,22 +22,6 @@ function getLoginInfo(info) {
 const error = chalk.redBright.bold;
 const warning = chalk.keyword('orange');
 
-// get the username(s) to check
-let usernames = []
-argv._.length != 0 && (argv._.forEach(username => usernames.push(username))) // usernames from shell arguments
-process.env.usernames && (process.env.usernames.split(',').forEach(username => usernames.push(username))) // usernames from .env file
-usernames = [... new Set(usernames)] // remove duplicates
-// filter the [','] from ↑ and the username who don't match the regex.
-usernames = usernames.filter(username => {
-  if (username != ',' && username.match('.*#[0-9]{4}')) {
-    return true
-  } else if (username != ',' && !username.match('.*#[0-9]{4}')) {
-    console.log(`${username} didn't match the regex .*#[0-9]{4} for discord username ! ${username} will not be checked !`)
-    return false
-  }
-})
-argv.quiet || console.log(chalk.green('thoses usernames will be checked :', usernames));
-
 // get user input interface for OTP
 const readline = require('readline').createInterface({
   input: process.stdin,
@@ -41,24 +30,43 @@ const readline = require('readline').createInterface({
 
 (async () => {
 
-  async function check(username) {
-    await page.click('[class*=searchBarComponent-]')
-    await page.type('[class*=quickswitcher-] > input', '@'+username)
-    await page.waitForSelector('[class^="contentDefault-"] > [class^="iconContainer-"]')
-    if (await page.$('[class^="contentDefault-"] > [class^="iconContainer-"]') === null) {
-      console.log(error("couldn't find the user "+username))
-      console.log(warning(`please try to manually search @${username} in the discord find menu too verify`))
+  let currentSelectedUsername = ""
+  async function selectUsername(username) {
+    if (currentSelectedUsername != username) {
+      await page.click('[class*=searchBarComponent-]')
+      await page.type('[class*=quickswitcher-] > input', '@'+username)
+      await page.waitForSelector('[class^="content"] > [class^="iconContainer-"]')
+        .catch(e => {
+          console.log(error(`couldn't find @${username} please try to manually search in the discord find menu too verify`))
+          console.log(e)
+          process.exit(1)
+        })
+      await page.click('[class^="content"] > [class^="iconContainer-"]')
+      currentSelectedUsername = username
     }
-    await page.click('[class^="contentDefault-"] > [class^="iconContainer-"]')
+  }
+
+  async function getStatus(username) {
+    await selectUsername(username)
+    await page.click('h3[class*=title][role=button]')
     let status = (await page.evaluate(() => {
-      return document.querySelector('a[class*=selected-] > div > div > div > svg > rect').getAttribute('mask')
+      return document.querySelector('div[class*=topSectionNormal-] > header > div[class*=avatar-] > svg[class*=mask-] > rect[class*=pointerEvent]').getAttribute('mask')
     }))
+    await page.mouse.click(0, 0)
     return status.replace('url(#svg-mask-status-', '').replace(')', '')
+  }
+
+  async function sendMessage(username, message) {
+    await selectUsername(username)
+    await page.type('[class*=slateTextArea]', message)
+    await page.type('[class*=slateTextArea]', String.fromCharCode(13));
+    // from what i've seen the id [0-9] is always 19 char long but we never know so a + work
+    await page.waitForResponse(res => res.url().match('https://discord.com/api/v8/channels/[0-9]+/messages'))
   }
 
   const browser = await puppeteer.launch({headless: argv.headless, defaultViewport: {width: 1280, height: 720}});
   const page = await browser.newPage();
-  await page.goto('https://discord.com/channels/@me', {waitUntil: 'networkidle0'});
+  await page.goto('https://discord.com/channels/@me', {waitUntil: 'networkidle0', timeout: 60000});
 
   await page.type('[name="email"]', getLoginInfo('email'));
   await page.type('[name="password"]', getLoginInfo('password'));
@@ -168,20 +176,49 @@ const readline = require('readline').createInterface({
     })
   }
 
-  for (username of usernames) {
-    let status = await check(username)
-    if (argv.quiet) {
-      console.log(username, status)
-    } else {
-      const responses = {
-        online: chalk.green("online"),
-        offline: chalk.gray("offline"),
-        idle: chalk.keyword("orange")("idle"),
-        dnd: chalk.red("do not disturb")
+  let inUse = false
+  app.get('/status', async (req, res) => {
+    if (!inUse) {
+      inUse = true
+      let status = {}
+      for (username of req.body) {
+        if (username.match('.*#[0-9]{4}')) {
+          status[username] = await getStatus(username)
+          await page.waitForTimeout(600)
+        } else {
+          status[username] = "invalid username. regex didn't match"
+        }
       }
-      console.log(chalk.bold(`${username} : ${responses[status] || chalk.green(status)}`))
+      res.send(status)
+      inUse = false
+    } else {
+      res.statusMessage = "worker in use please retry later"
+      res.sendStatus(429)
     }
-  }
-  await browser.close();
-  process.exit(0) // i don't know why node doesn't exit by itself after the browser.close(), and there is no more puppeteer process
+  });
+
+  app.post('/message', async (req, res) => {
+    if (!inUse) {
+      inUse = true
+      let response = {}
+      for (username in req.body) {
+        if (username.match('.*#[0-9]{4}')) {
+          await sendMessage(username, req.body[username])
+          // await page.waitForTimeout(400)
+        } else {
+          response[username] = "invalid username. regex didn't match"
+        }
+      }
+      res.send(response)
+      inUse = false
+    } else {
+      res.statusMessage = "worker in use please retry later"
+      res.sendStatus(429)
+    }
+  })
+
+  let PORT = process.env.PORT || argv.port || 8080
+  app.listen(PORT, () => {
+    console.log(`Listening at port :${PORT}`);
+  });
 })()
