@@ -4,13 +4,17 @@
 
 ![demonstration](demonstration.png)
 
+you can check your friends online status and send them messages.
+it mean you can also send message to yourself from a shell or anything that can do a http request. it mean you can get push notification to your phone through discord ! for example after a long lasting task.
+
 onetime.js for a single check.<br>
 server.js keep chrome connected to discord, you can then send http request to it how much you want when you want.<br>
-example a script wich send a http request on /status every 10min to check the status of your friends, and if the status change from last request, you can send them a message with /message.
+example a script wich send a http request on /status every 10min to check the status of your friends, and if the status change to online from last request, you can send them a message with /message.
 
 
 ## configuration
 
+- this is probably against discord TOS so at your own risk and use a second account.
 - you need to edit `.env.example` and change the necessary item and save it as `.env`
     note that if it's the first connecting to the account on a IP adresse it will ask for a captcha and a email verification. the script is supposed to take it into account, you just need to follow instructions
 
