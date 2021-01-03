@@ -1,4 +1,5 @@
 const puppeteer = require('puppeteer');
+const { PendingXHR } = require('pending-xhr-puppeteer');
 const totp = require('totp-generator');
 require('dotenv').config()
 const chalk = require('chalk');
@@ -145,7 +146,6 @@ const readline = require('readline').createInterface({
                       .then(json => loginOK(shownPage, json))
                   })
 
-                console.log("waiting for searchBarComponent")
                 await shownPage.waitForSelector('[class^=searchBarComponent-]', {timeout: 0})
                 await shownBrowser.close()
                 await page.reload()
@@ -162,24 +162,10 @@ const readline = require('readline').createInterface({
           }
         })
     })
-    await page.waitForSelector('[class^=searchBarComponent-]', {timeout: 60000})
-
-    // my ugly baby to remediate the lack of page.waitForNetwork() https://github.com/puppeteer/puppeteer/issues/5328
-    async function waitForNetwork(duration) {
-      let epochLastResponse = Math.floor(new Date() / 1000)
-      page.on("response", res => {
-        epochLastResponse = Math.floor(new Date() / 1000)
-      })
-      await new Promise(async resolve => {
-        let checkResponseInterval = await setInterval(() => {
-          if(Math.floor(new Date() / 1000) - 2 >= epochLastResponse) {
-            clearInterval(checkResponseInterval)
-            resolve()
-          }
-        }, 1000)
-      })
-    }
   }
+  await page.waitForSelector('[class^=searchBarComponent-]', {timeout: 60000})
+  const pendingXHR = new PendingXHR(page);
+  await pendingXHR.waitForAllXhrFinished();
 
   for (username of usernames) {
     let status = await getStatus(username)

@@ -1,9 +1,12 @@
 const puppeteer = require('puppeteer');
+const FormData  = require('form-data');
 const morgan = require('morgan')
 const express = require('express');
 const totp = require('totp-generator');
+const { PendingXHR } = require('pending-xhr-puppeteer');
 require('dotenv').config()
 const chalk = require('chalk');
+const axios = require('axios');
 const argv = require('minimist')(process.argv.slice(2), {default: {headless: true, chromeSession: 'PrivateChromeSessions'}, boolean: ["headless"], string: ['chromeSession']});
 const app = express();
 app.use(morgan('common'))
@@ -46,24 +49,6 @@ const readline = require('readline').createInterface({
     }
   }
 
-  async function getStatus(username) {
-    await selectUsername(username)
-    await page.click('h3[class*=title][role=button]')
-    let status = (await page.evaluate(() => {
-      return document.querySelector('div[class*=topSectionNormal-] > header > div[class*=avatar-] > svg[class*=mask-] > rect[class*=pointerEvent]').getAttribute('mask')
-    }))
-    await page.mouse.click(0, 0)
-    return status.replace('url(#svg-mask-status-', '').replace(')', '')
-  }
-
-  async function sendMessage(username, message) {
-    await selectUsername(username)
-    await page.type('[class*=slateTextArea]', message)
-    await page.type('[class*=slateTextArea]', String.fromCharCode(13));
-    // from what i've seen the id [0-9] is always 19 char long but we never know so a + work
-    await page.waitForResponse(res => res.url().match('https://discord.com/api/v8/channels/[0-9]+/messages'))
-  }
-
   const browser = await puppeteer.launch({headless: argv.headless, defaultViewport: {width: 1280, height: 720}, userDataDir: argv.chromeSession});
   const page = await browser.newPage();
   await page.goto('https://discord.com/channels/@me', {waitUntil: 'networkidle0', timeout: 60000});
@@ -90,7 +75,7 @@ const readline = require('readline').createInterface({
           await page.waitForResponse(response => response.url().includes('https://discord.com/api/v8/auth/mfa/totp'))
             .then(res => {
               if (res.ok()) { 
-                argv.quiet || console.log(chalk.green('successfully connected to discord'))
+                console.log(chalk.green('successfully connected to discord'))
                 resolve()
               } else {
                 res.json().then(json => {
@@ -112,7 +97,7 @@ const readline = require('readline').createInterface({
           }
           process.exit(1)
         } else {
-          argv.quiet || console.log(chalk.green('successfully connected to discord'))
+          console.log(chalk.green('successfully connected to discord'))
           resolve()
         }
       }
@@ -163,24 +148,13 @@ const readline = require('readline').createInterface({
           }
         })
     })
-    await page.waitForSelector('[class^=searchBarComponent-]', {timeout: 60000})
-
-    // my ugly baby to remediate the lack of page.waitForNetwork() https://github.com/puppeteer/puppeteer/issues/5328
-    async function waitForNetwork(duration) {
-      let epochLastResponse = Math.floor(new Date() / 1000)
-      page.on("response", res => {
-        epochLastResponse = Math.floor(new Date() / 1000)
-      })
-      await new Promise(async resolve => {
-        let checkResponseInterval = await setInterval(() => {
-          if(Math.floor(new Date() / 1000) - 2 >= epochLastResponse) {
-            clearInterval(checkResponseInterval)
-            resolve()
-          }
-        }, 1000)
-      })
-    }
+  } else {
+    console.log(chalk.green('successfully connected to discord'))
   }
+
+  await page.waitForSelector('[class^=searchBarComponent-]', {timeout: 60000})
+  const pendingXHR = new PendingXHR(page);
+  await pendingXHR.waitForAllXhrFinished();
 
   let inUse = false
   app.get('/status', async (req, res) => {
@@ -189,7 +163,13 @@ const readline = require('readline').createInterface({
       let status = {}
       for (username of req.body) {
         if (username.match('.*#[0-9]{4}')) {
-          status[username] = await getStatus(username)
+          await selectUsername(username)
+          await page.click('h3[class*=title][role=button]')
+          let status = (await page.evaluate(() => {
+            return document.querySelector('div[class*=topSectionNormal-] > header > div[class*=avatar-] > svg[class*=mask-] > rect[class*=pointerEvent]').getAttribute('mask')
+          }))
+          await page.mouse.click(0, 0)
+          status[username] = await status.replace('url(#svg-mask-status-', '').replace(')', '')
           await page.waitForTimeout(600)
         } else {
           status[username] = "invalid username. regex didn't match"
@@ -209,8 +189,40 @@ const readline = require('readline').createInterface({
       let response = {}
       for (username in req.body) {
         if (username.match('.*#[0-9]{4}')) {
-          await sendMessage(username, req.body[username])
-          // await page.waitForTimeout(400)
+          await selectUsername(username)
+          await page.type('[class*=slateTextArea]', req.body[username])
+          await page.type('[class*=slateTextArea]', String.fromCharCode(13));
+          // from what i've seen the id [0-9] is always 19 char long but we never know so a + work
+          await page.waitForResponse(res => res.url().match('https://discord.com/api/v8/channels/[0-9]+/messages'))
+        } else {
+          response[username] = "invalid username. regex didn't match"
+        }
+      }
+      res.send(response)
+      inUse = false
+    } else {
+      res.statusMessage = "worker in use please retry later"
+      res.sendStatus(429)
+    }
+  })
+
+  app.get('/chat', async (req, res) => {
+    if (!inUse) {
+      inUse = true
+      let response = {}
+      for (username in req.body) {
+        if (username.match('.*#[0-9]{4}')) {
+          await selectUsername(username)
+          await pendingXHR.waitForAllXhrFinished();
+          let screenshot = await (await page.$('div[class*=chat-]')).screenshot({encoding: "base64"})
+          let form = new FormData();
+          form.append("image", screenshot)
+          form.append("expiration", req.body[username] != 0 ? req.body[username] : 6*3600)
+          await axios.post(`https://api.imgbb.com/1/upload?key=${process.env.imgbb_key}`, form, { headers: form.getHeaders() })
+            .then(res => {
+              response[username] = res.data
+            })
+            .catch(e => response[username] = e)
         } else {
           response[username] = "invalid username. regex didn't match"
         }
@@ -225,6 +237,6 @@ const readline = require('readline').createInterface({
 
   let PORT = process.env.PORT || argv.port || 8080
   app.listen(PORT, () => {
-    console.log(`Listening at port :${PORT}`);
+    console.log(chalk.green(`Listening at port :${PORT}`));
   });
 })()
