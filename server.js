@@ -165,16 +165,15 @@ const readline = require('readline').createInterface({
         if (username.match('.*#[0-9]{4}')) {
           await selectUsername(username)
           await page.click('h3[class*=title][role=button]')
-          let status = (await page.evaluate(() => {
-            return document.querySelector('div[class*=topSectionNormal-] > header > div[class*=avatar-] > svg[class*=mask-] > rect[class*=pointerEvent]').getAttribute('mask')
-          }))
+          let statu = await page.$eval('div[class*=topSectionNormal-] > header > div[class*=avatar-] > svg[class*=mask-] > rect[class*=pointerEvent]', el => el.getAttribute('mask'))
           await page.mouse.click(0, 0)
-          status[username] = await status.replace('url(#svg-mask-status-', '').replace(')', '')
+          status[username] = await statu.replace('url(#svg-mask-status-', '').replace(')', '')
           await page.waitForTimeout(600)
         } else {
           status[username] = "invalid username. regex didn't match"
         }
       }
+      console.log(status)
       res.send(status)
       inUse = false
     } else {
