@@ -1,4 +1,5 @@
 const puppeteer = require('puppeteer');
+const helmet = require('helmet')
 const FormData  = require('form-data');
 const morgan = require('morgan')
 const express = require('express');
@@ -11,6 +12,7 @@ const argv = require('minimist')(process.argv.slice(2), {default: {headless: tru
 const app = express();
 app.use(morgan('common'))
 app.use(express.json()); 
+app.use(hemet())
 
 function getLoginInfo(info) { 
   if (eval(`process.env.${info}`)) {
