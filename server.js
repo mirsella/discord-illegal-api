@@ -1,4 +1,6 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth')
+puppeteer.use(StealthPlugin())
 const helmet = require('helmet')
 const FormData  = require('form-data');
 const morgan = require('morgan')
@@ -12,7 +14,7 @@ const argv = require('minimist')(process.argv.slice(2), {default: {headless: tru
 const app = express();
 app.use(morgan('common'))
 app.use(express.json()); 
-app.use(hemet())
+app.use(helmet())
 
 function getLoginInfo(info) { 
   if (eval(`process.env.${info}`)) {
@@ -116,7 +118,7 @@ const readline = require('readline').createInterface({
 
                 const shownBrowser = await puppeteer.launch({headless: false, defaultViewport: null, userDataDir: argv.chromeSession});
                 const shownPage = await shownBrowser.newPage();
-                await shownPage.goto('https://discord.com/channels/@me', {waitUntil: 'networkidle0', timeout: 60000});
+                await shownPage.goto('https://discord.com/channels/@me', {waitUntil: 'networkidle0', timeout: 120000});
 
                 await shownPage.type('[name="email"]', getLoginInfo('email'));
                 await shownPage.type('[name="password"]', getLoginInfo('password'));
@@ -159,7 +161,7 @@ const readline = require('readline').createInterface({
   await pendingXHR.waitForAllXhrFinished();
 
   let inUse = false
-  app.get('/status', async (req, res) => {
+  app.post('/status', async (req, res) => {
     if (!inUse) {
       inUse = true
       let status = {}
@@ -207,7 +209,20 @@ const readline = require('readline').createInterface({
     }
   })
 
-  app.get('/chat', async (req, res) => {
+  app.get('/reload', async (req, res) => {
+    inUse = true
+    await page.reload()
+      .then(e => {
+        res.sendStatus(200)
+        inUse = false
+      })
+      .catch(e => {
+        res.statusMessage("couldn't reload discord")
+        res.status(500).end()
+      })
+  })
+
+  app.post('/chat', async (req, res) => {
     if (!inUse) {
       inUse = true
       let response = {}
