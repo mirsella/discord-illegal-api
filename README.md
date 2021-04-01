@@ -35,7 +35,7 @@ example a script wich send a http request on /status every 10min to check the st
 ### server.js
 it bring up a express web server with 3 endpoints.
 
-<b>/status</b> : GET request with a json list of usernames :<br>
+<b>/status</b> : POST request with a json list of usernames :<br>
 `["user#1234", "foo#7896"]`<br>
 and return : `{"user#1234": "online", "foo#7896": "dnd"}`<br>
 
@@ -43,10 +43,12 @@ and return : `{"user#1234": "online", "foo#7896": "dnd"}`<br>
 `{"user#1234": "hello from nodejs", "foo#7896": "hey, call me when you can"}`<br>
 and return `{}` if it problaly worked, as if it didn't work the server crash and it return nothing haha.<br>
 
-<b>/chat</b> : GET request with a json body of `username: expirationTimeInSec` :<br>
+<b>/chat</b> : POST request with a json body of `username: expirationTimeInSec` :<br>
 `{"user#1234": 0, "foo#7896": "3600"}`<br>
 0 is the default which is 6 hours.
 and return https://api.imgbb.com/#api-response <br>
+
+<b>/reload</b> : POST request without body, to reload the discord web page. used if there is a problem, the worker don't respond and such, if it's blocked.<br>
 
 
 if a username is incorrect it will return `{"invalidusername": "invalid username. regex didn't match"}` btw the regex is `.*#[0-9]{4}`

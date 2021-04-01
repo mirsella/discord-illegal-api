@@ -209,7 +209,7 @@ const readline = require('readline').createInterface({
     }
   })
 
-  app.get('/reload', async (req, res) => {
+  app.post('/reload', async (req, res) => {
     inUse = true
     await page.reload()
       .then(e => {
