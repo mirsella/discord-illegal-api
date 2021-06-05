@@ -4,7 +4,7 @@
 		"chalk": "^4.1.0",
 		"dotenv": "^8.2.0",
 		"express": "^4.17.1",
-		"form-data": "^3.0.1",
+		"form-data": "^4.0.0",
 		"helmet": "^4.4.1",
 		"imgbbjs": "^1.0.4",
 		"minimist": "^1.2.5",
