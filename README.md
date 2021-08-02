@@ -1,4 +1,3 @@
-# get your discord friends status !
 ## don't hesitate to open a issue for any question or improvement.
 
 
