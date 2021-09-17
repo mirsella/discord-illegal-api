@@ -10,7 +10,7 @@
 		"pending-xhr-puppeteer": "^2.3.3",
 		"puppeteer": "^10.2.0",
 		"puppeteer-extra": "^3.1.18",
-		"puppeteer-extra-plugin-stealth": "^2.7.6",
+		"puppeteer-extra-plugin-stealth": "^2.7.10",
 		"totp-generator": "^0.0.9"
 	}
 }
