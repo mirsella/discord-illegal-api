@@ -9,7 +9,7 @@
 		"morgan": "^1.10.0",
 		"pending-xhr-puppeteer": "^2.3.3",
 		"puppeteer": "^10.4.0",
-		"puppeteer-extra": "^3.2.2",
+		"puppeteer-extra": "^3.2.3",
 		"puppeteer-extra-plugin-stealth": "^2.8.1",
 		"totp-generator": "^0.0.9"
 	}
