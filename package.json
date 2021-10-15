@@ -11,6 +11,6 @@
 		"puppeteer": "^10.4.0",
 		"puppeteer-extra": "^3.2.3",
 		"puppeteer-extra-plugin-stealth": "^2.8.2",
-		"totp-generator": "^0.0.10"
+		"totp-generator": "^0.0.12"
 	}
 }
